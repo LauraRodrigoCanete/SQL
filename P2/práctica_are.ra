@@ -1,0 +1,117 @@
+-- Autores: Leonardo Macías y Laura Rodrigo
+-- Para procesar este archivo (se puede especificar también la ruta): /process datos.ra
+/abolish
+/multiline on
+
+/sql
+-- Antes debéis crear las relaciones (tablas).
+create table programadores(dni string primary key, nombre string,
+dirección string, teléfono string);
+
+create table analistas(dni string primary key, nombre string, dirección string, teléfono
+string);
+
+create table distribución(códigopr string, dniemp string, horas int, primary key (códigopr, dniemp));
+
+create table proyectos(código string, descripción string, dnidir string);
+
+-- Falta la última tupla de cada tabla y debéis escribir vosotros la instrucción de inserción en cada caso
+
+insert into programadores(dni, nombre, dirección, teléfono) values('1','Jacinto','Jazmín 4','91-8888888');
+insert into programadores(dni, nombre, dirección, teléfono) values('2','Herminia','Rosa 4','91-7777777');
+insert into programadores(dni, nombre, dirección, teléfono) values('3','Calixto','Clavel 3','91-1231231');
+insert into programadores(dni, nombre, dirección, teléfono) values('4','Teodora','Petunia 3','91-6666666');
+
+insert into analistas(dni, nombre, dirección, teléfono) values('4','Teodora','Petunia 3','91-6666666');
+insert into analistas(dni, nombre, dirección, teléfono) values('5','Evaristo','Luna 1','91-1111111');
+insert into analistas(dni, nombre, dirección, teléfono) values('6','Luciana','Júpiter 2','91-8888888');
+insert into analistas(dni, nombre, dirección, teléfono) values('7','Nicodemo','Plutón 3', NULL);
+
+-- Para crear una clave primaria de más de un atributo hay que añadir al final como si fuese otro campo lo siguiente: primary key (códigopr, dniemp)
+insert into distribución(códigopr, dniemp, horas) values('P1','1',10);
+insert into distribución(códigopr, dniemp, horas) values('P1','2',40);
+insert into distribución(códigopr, dniemp, horas) values('P1','4',5);
+insert into distribución(códigopr, dniemp, horas) values('P2','4',10);
+insert into distribución(códigopr, dniemp, horas) values('P3','1',10);
+insert into distribución(códigopr, dniemp, horas) values('P3','3',40);
+insert into distribución(códigopr, dniemp, horas) values('P3','4',5);
+insert into distribución(códigopr, dniemp, horas) values('P3','5',30);
+insert into distribución(códigopr, dniemp, horas) values('P4','4',20);
+insert into distribución(códigopr, dniemp, horas) values('P4','5',10);
+
+
+insert into proyectos(código, descripción, dnidir) values('P1','Nómina','4');
+insert into proyectos(código, descripción, dnidir) values('P2','Contabilidad','4');
+insert into proyectos(código, descripción, dnidir) values('P3','Producción','5');
+insert into proyectos(código, descripción, dnidir) values('P4','Clientes','5');
+insert into proyectos(código, descripción, dnidir) values('P5','Ventas','6');
+
+-- Ejercicios
+/ra
+vista1 := project dni (programadores njoin analistas);
+
+
+empleados := programadores union analistas;
+empleados_y_proyecto := (empleados) ljoin dniemp = dni (distribución);
+empleados_sin_proyecto := select horas IS NULL (empleados_y_proyecto);
+empladossp_cero(dni, horas) := project dni, 0 (empleados_sin_proyecto);
+vista2(dni, horas) := group_by dniemp dniemp, sum(horas) true (distribución) union empladossp_cero;
+
+vista3(dni, nombre, proyecto) := project dni, nombre, códigopr (empleados_y_proyecto);
+
+vista4(dni, nombre) := project dni, nombre (select teléfono is NULL (empleados));
+
+-- Obtener cociente horas/proyecto para cada empleado que no tenga 0 proyectos
+num_proyectos_empleado(dni, cantidad_proyectos) := group_by dni dni, count(códigopr) count(códigopr) != 0 (empleados_y_proyecto);
+empleados_horas_cantidad_aux := vista2 njoin num_proyectos_empleado;
+cociente_horas_proyecto_por_empleado (dni, número1) := project dni, horas / cantidad_proyectos (empleados_horas_cantidad_aux);
+
+-- Si quisieramos tener en cuenta los que no participan en proyectos:
+--vista2_con_float(dni, número1) := project dni, 0.0 (select horas=0 (vista2));
+--cociente_con_ceros(dni, número1) := cociente_horas_proyecto_por_empleado union (vista2_con_float);
+
+dni_evaristo(dni_evar) := project dni (select nombre = 'Evaristo' (empleados));
+cociente_sin_evaristo(dni, número1) := project dni, número1 (dni_evaristo zjoin dni != dni_evar (cociente_horas_proyecto_por_empleado));
+
+--Calculamos el otro lado de la desigualdad, es un dato cte para todos los emp
+datos_proyectos(códigopr, horaspr, emppr) := group_by códigopr códigopr, sum(horas), count(dniemp) true (distribución);
+cociente_general(número2) := group_by [] avg(horaspr / emppr) true (datos_proyectos);
+vista5 (dni, número) := project dni, número1 (select número1<número2 (cociente_sin_evaristo product cociente_general));
+
+proyectos_con_evaristo := project códigopr (select nombre = 'Evaristo' (empleados_y_proyecto));
+compañeros_de_evaristo := project dni  (proyectos_con_evaristo njoin empleados_y_proyecto);
+empleados_y_proyectos_compañeros_de_evaristo := empleados_y_proyecto njoin compañeros_de_evaristo;
+empleados_y_proyectos_sin_compis_evaristo := select códigopr is not null (empleados_y_proyecto difference empleados_y_proyectos_compañeros_de_evaristo);
+vista6 (dni, códigopr, horas) := project dni, códigopr, 1.2*horas (empleados_y_proyectos_sin_compis_evaristo);
+
+
+vista7_aux(dniemp) := (project dniemp, códigopr (distribución)) division (project códigopr (distribución zjoin dniemp = dni_evar (dni_evaristo))); 
+
+vista7(dni) := project dniemp (vista7_aux zjoin dniemp != dni_evar (dni_evaristo));                                                               
+evaristo_proyectos(dni_evar, códigoprevar) := (project dni_evar, códigopr (distribución zjoin dniemp = dni_evar (dni_evaristo)));
+
+vista8_aux := project códigopr, dniemp, códigoprevar (distribución product evaristo_proyectos);             
+
+num_proy_evar(num_proy) := group_by [] count(códigoprevar) true (evaristo_proyectos);
+
+vista8_aux2(num_proy, dniemp, proy_iguales) := num_proy_evar product (group_by dniemp dniemp, count(códigopr) true (select códigopr = códigoprevar (vista8_aux)));
+                                       
+vista8(dni) := project dniemp (select num_proy = proy_iguales and dniemp != dni_evar (vista8_aux2 product dni_evaristo));
+
+tienejefe(emp, jefe) := project dniemp, dnidir( distribución zjoin códigopr = código (proyectos));
+
+jeferecursivo(emp,jefe) := project emp,jefe (tienejefe) union project e1,j2 (rename j1(e1,j1) (jeferecursivo) zjoin j1=e2 rename j2(e2,j2) (jeferecursivo));
+
+vista9 (dni) := (project emp (dni_evaristo zjoin jefe = dni_evar jeferecursivo)) difference dni_evaristo;
+
+-- Mostrar vistas
+ select true (vista1);
+ select true (vista2);
+ select true (vista3);
+ select true (vista4);
+ select true (vista5);
+ select true (vista6);
+ select true (vista7);
+ select true (vista8);
+ select true (vista9);
+
